@@ -39,6 +39,9 @@ cdef class InferRequest:
 
 cdef class IENetwork:
     cdef C.IENetwork impl
+    cdef string model
+    cdef string weights
+    cdef bool init_from_buffer
 
 cdef class ExecutableNetwork:
     cdef unique_ptr[C.IEExecNetwork] impl
@@ -50,6 +53,7 @@ cdef class ExecutableNetwork:
 
 cdef class IECore:
     cdef C.IECore impl
+    cdef string xml_config_file
     cpdef IENetwork read_network(self, model : [str, bytes, os.PathLike], weights : [str, bytes, os.PathLike] = ?, bool init_from_buffer = ?)
     cpdef ExecutableNetwork load_network(self, IENetwork network, str device_name, config = ?, int num_requests = ?)
     cpdef ExecutableNetwork import_network(self, str model_file, str device_name, config = ?, int num_requests = ?)

@@ -214,6 +214,7 @@ cdef class Blob:
         tensor_desc = TensorDesc(precision, dims, layout_int_to_str_map[layout])
         return tensor_desc
 
+from ie_api_supp import rebuild_IECore
 ## This class represents an Inference Engine entity and allows you to manipulate with plugins using unified interfaces.
 cdef class IECore:
     ## Class constructor
@@ -221,7 +222,11 @@ cdef class IECore:
     #                          If the parameter is not specified, the default configuration is handled automatically.
     # @return Instance of IECore class
     def __cinit__(self, xml_config_file: str = ""):
+        self.xml_config_file = xml_config_file.encode()
         self.impl = C.IECore(xml_config_file.encode())
+
+    def __reduce__(self):
+        return (rebuild_IECore, (self.xml_config_file.decode(),))
 
     ## Get a `namedtuple` object with versions of the plugin specified
     #  @param device_name: Name of the the registered plugin
@@ -753,12 +758,16 @@ cdef class CDataPtr:
         return deref(self._ptr).isInitialized()
 
 
+from ie_api_supp import rebuild_ExecutableNetwork
 ## This class represents a network instance loaded to plugin and ready for inference.
 cdef class ExecutableNetwork:
     ## There is no explicit class constructor. To make a valid instance of `ExecutableNetwork`,
     #  use `load_network()` method of the `IECore` class.
     def __init__(self):
         self._infer_requests = []
+
+    def __reduce__(self):
+        return (rebuild_ExecutableNetwork, ())
 
     ## Starts synchronous inference for the first infer request of the executable network and returns output data.
     #  Wraps `infer()` method of the `InferRequest` class
@@ -944,6 +953,8 @@ cdef class ExecutableNetwork:
 
 ctypedef extern void (*cb_type)(void*, int) with gil
 
+
+from ie_api_supp import rebuild_InferRequest
 ## This class provides an interface to infer requests of `ExecutableNetwork` and serves to handle infer requests execution
 #  and to set and get output data.
 cdef class InferRequest:
@@ -958,6 +969,9 @@ cdef class InferRequest:
         self._py_callback_used = False
         self._py_callback_called = threading.Event()
         self._py_data = None
+    
+    def __reduce__(self):
+        return (rebuild_InferRequest, ())
 
     cdef void user_callback(self, int status) with gil:
         if self._py_callback:
@@ -1223,6 +1237,7 @@ cdef class InferRequest:
             self.input_blobs[k].buffer[:] = v
 
 
+from ie_api_supp import rebuild_IENetwork
 ## This class contains the information about the network model read from IR and allows you to manipulate with
 #  some model parameters such as layers affinity and output layers.
 cdef class IENetwork:
@@ -1260,6 +1275,10 @@ cdef class IENetwork:
 
     def __cinit__(self, model: [str, bytes] = "", weights: [str, bytes] = "", init_from_buffer: bool = False):
         # Try to create Inference Engine network from capsule
+        self.model = model.encode()
+        self.weights = weights.encode()
+        self.init_from_buffer = init_from_buffer
+
         if model.__class__.__name__ == 'PyCapsule' and weights == '' and init_from_buffer is False:
             self.impl = C.IENetwork(model)
             return
@@ -1291,6 +1310,9 @@ cdef class IENetwork:
             else:
                 self.impl = C.IENetwork()
         free(xml_buffer)
+    
+    def __reduce__(self):
+        return (rebuild_IENetwork, (self.model.decode(), self.weights.decode(), self.init_from_buffer))
 
     ## Name of the loaded network
     @property
